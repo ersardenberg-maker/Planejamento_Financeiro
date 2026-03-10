@@ -1,0 +1,196 @@
+import uuid
+from datetime import datetime, date
+from decimal import Decimal
+from typing import Literal
+from pydantic import BaseModel, ConfigDict
+
+
+# ── Tipos permitidos ────────────────────────────────────────────
+TipoCategoria = Literal["receita", "despesa_fixa", "despesa_variavel"]
+MeioPagamento = Literal["cartao", "pix", "debito", "dinheiro", "transferencia", "outros"]
+StatusEmprestimo = Literal["ativo", "quitado", "pausado"]
+StatusParcela = Literal["pendente", "paga", "atrasada"]
+
+
+# ── Categoria ───────────────────────────────────────────────────
+class CategoriaCreate(BaseModel):
+    nome: str
+    tipo: TipoCategoria
+
+class CategoriaUpdate(BaseModel):
+    nome: str | None = None
+    tipo: TipoCategoria | None = None
+    ativo: bool | None = None
+
+class CategoriaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    nome: str
+    tipo: TipoCategoria
+    ativo: bool
+    criado_em: datetime
+
+
+# ── Cartão ──────────────────────────────────────────────────────
+class CartaoCreate(BaseModel):
+    nome: str
+    bandeira: str | None = None
+    dia_fechamento: int | None = None
+    dia_vencimento: int | None = None
+
+class CartaoUpdate(BaseModel):
+    nome: str | None = None
+    bandeira: str | None = None
+    dia_fechamento: int | None = None
+    dia_vencimento: int | None = None
+    ativo: bool | None = None
+
+class CartaoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    nome: str
+    bandeira: str | None
+    dia_fechamento: int | None
+    dia_vencimento: int | None
+    ativo: bool
+
+
+# ── Planejamento ────────────────────────────────────────────────
+class PlanejamentoCreate(BaseModel):
+    categoria_id: uuid.UUID
+    mes: int
+    ano: int
+    valor: Decimal
+
+class PlanejamentoUpdate(BaseModel):
+    valor: Decimal
+
+class PlanejamentoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    categoria_id: uuid.UUID
+    mes: int
+    ano: int
+    valor: Decimal
+    atualizado_em: datetime
+
+class PlanejamentoComCategoria(PlanejamentoOut):
+    categoria: CategoriaOut
+
+
+# ── Lançamento ──────────────────────────────────────────────────
+class LancamentoCreate(BaseModel):
+    categoria_id: uuid.UUID
+    descricao: str | None = None
+    valor: Decimal
+    data: date
+    meio_pagamento: MeioPagamento = "outros"
+    cartao_id: uuid.UUID | None = None
+    mes_fatura: int | None = None
+    ano_fatura: int | None = None
+    observacao: str | None = None
+
+class LancamentoUpdate(BaseModel):
+    categoria_id: uuid.UUID | None = None
+    descricao: str | None = None
+    valor: Decimal | None = None
+    data: date | None = None
+    meio_pagamento: MeioPagamento | None = None
+    cartao_id: uuid.UUID | None = None
+    mes_fatura: int | None = None
+    ano_fatura: int | None = None
+    observacao: str | None = None
+
+class LancamentoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    categoria_id: uuid.UUID
+    descricao: str | None
+    valor: Decimal
+    data: date
+    meio_pagamento: str
+    cartao_id: uuid.UUID | None
+    mes_fatura: int | None
+    ano_fatura: int | None
+    observacao: str | None
+    criado_em: datetime
+
+class LancamentoDetalhe(LancamentoOut):
+    categoria: CategoriaOut
+    cartao: CartaoOut | None
+
+
+# ── Empréstimo ──────────────────────────────────────────────────
+class EmprestimoCreate(BaseModel):
+    nome: str
+    valor_total: Decimal
+    valor_parcela: Decimal
+    total_parcelas: int
+    data_inicio: date
+    dia_vencimento: int | None = None
+    taxa_juros_mensal: Decimal | None = None
+    credor: str | None = None
+    observacao: str | None = None
+
+class EmprestimoUpdate(BaseModel):
+    nome: str | None = None
+    valor_parcela: Decimal | None = None
+    parcelas_pagas: int | None = None
+    dia_vencimento: int | None = None
+    status: StatusEmprestimo | None = None
+    observacao: str | None = None
+
+class EmprestimoOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    nome: str
+    valor_total: Decimal
+    valor_parcela: Decimal
+    total_parcelas: int
+    parcelas_pagas: int
+    data_inicio: date
+    dia_vencimento: int | None
+    taxa_juros_mensal: Decimal | None
+    credor: str | None
+    status: StatusEmprestimo
+    observacao: str | None
+
+
+# ── Parcela ─────────────────────────────────────────────────────
+class ParcelaUpdate(BaseModel):
+    data_pagamento: date | None = None
+    valor_pago: Decimal | None = None
+    status: StatusParcela | None = None
+    lancamento_id: uuid.UUID | None = None
+
+class ParcelaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    emprestimo_id: uuid.UUID
+    numero_parcela: int
+    data_vencimento: date
+    data_pagamento: date | None
+    valor_previsto: Decimal
+    valor_pago: Decimal | None
+    status: StatusParcela
+
+
+# ── Dashboard ───────────────────────────────────────────────────
+class ResumoMensal(BaseModel):
+    categoria: str
+    tipo: TipoCategoria
+    mes: int
+    ano: int
+    planejado: Decimal
+    realizado: Decimal
+    diferenca: Decimal
+
+class SaldoMensal(BaseModel):
+    mes: int
+    ano: int
+    total_receitas: Decimal
+    total_despesas: Decimal
+    saldo_realizado: Decimal
+    total_receitas_plan: Decimal
+    total_despesas_plan: Decimal
+    saldo_planejado: Decimal
