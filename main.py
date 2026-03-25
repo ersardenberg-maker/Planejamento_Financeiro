@@ -11,7 +11,7 @@ app = FastAPI(
 # CORS — permite o frontend (e o mobile) chamar a API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Em produção, troque por ["https://seu-dominio.com"]
+    allow_origins=["https://planejamento-financeiro-frontend.vercel.app"],  # Em produção, troque por ["https://seu-dominio.com"]
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
