@@ -68,9 +68,26 @@ class Lancamento(Base):
     observacao: Mapped[str | None] = mapped_column(Text)
     criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     atualizado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    recorrencia_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("recorrencias.id"))
 
     categoria: Mapped["Categoria"] = relationship(back_populates="lancamentos")
     cartao: Mapped["Cartao | None"] = relationship(back_populates="lancamentos")
+
+
+class Recorrencia(Base):
+    __tablename__ = "recorrencias"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    categoria_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("categorias.id"))
+    descricao: Mapped[str] = mapped_column(String(255), nullable=False)
+    valor: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    dia: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    meio_pagamento: Mapped[str] = mapped_column(String(30), nullable=False, default="outros")
+    cartao_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("cartoes.id"))
+    ativo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    data_inicio: Mapped[date | None] = mapped_column(Date)
+    data_fim: Mapped[date | None] = mapped_column(Date)
+    criado_em: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
 class Emprestimo(Base):

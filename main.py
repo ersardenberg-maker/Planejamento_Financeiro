@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from database import get_db
-from routers import categorias, cartoes, planejamento, lancamentos, emprestimos, dashboard
+from routers import categorias, cartoes, planejamento, lancamentos, emprestimos, recorrencias, dashboard
 
 app = FastAPI(
     title="Financa Familiar API",
@@ -24,6 +24,7 @@ app.include_router(cartoes.router)
 app.include_router(planejamento.router)
 app.include_router(lancamentos.router)
 app.include_router(emprestimos.router)
+app.include_router(recorrencias.router)
 app.include_router(dashboard.router)
 
 

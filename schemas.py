@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime, date
 from decimal import Decimal
 from typing import Literal
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 # ── Tipos permitidos ────────────────────────────────────────────
@@ -35,14 +35,14 @@ class CategoriaOut(BaseModel):
 class CartaoCreate(BaseModel):
     nome: str
     bandeira: str | None = None
-    dia_fechamento: int | None = None
-    dia_vencimento: int | None = None
+    dia_fechamento: int | None = Field(default=None, ge=1, le=31)
+    dia_vencimento: int | None = Field(default=None, ge=1, le=31)
 
 class CartaoUpdate(BaseModel):
     nome: str | None = None
     bandeira: str | None = None
-    dia_fechamento: int | None = None
-    dia_vencimento: int | None = None
+    dia_fechamento: int | None = Field(default=None, ge=1, le=31)
+    dia_vencimento: int | None = Field(default=None, ge=1, le=31)
     ativo: bool | None = None
 
 class CartaoOut(BaseModel):
@@ -58,12 +58,12 @@ class CartaoOut(BaseModel):
 # ── Planejamento ────────────────────────────────────────────────
 class PlanejamentoCreate(BaseModel):
     categoria_id: uuid.UUID
-    mes: int
-    ano: int
-    valor: Decimal
+    mes: int = Field(ge=1, le=12)
+    ano: int = Field(ge=2000)
+    valor: Decimal = Field(ge=0)
 
 class PlanejamentoUpdate(BaseModel):
-    valor: Decimal
+    valor: Decimal = Field(ge=0)
 
 class PlanejamentoOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -82,23 +82,23 @@ class PlanejamentoComCategoria(PlanejamentoOut):
 class LancamentoCreate(BaseModel):
     categoria_id: uuid.UUID
     descricao: str | None = None
-    valor: Decimal
+    valor: Decimal = Field(gt=0)
     data: date
     meio_pagamento: MeioPagamento = "outros"
     cartao_id: uuid.UUID | None = None
-    mes_fatura: int | None = None
-    ano_fatura: int | None = None
+    mes_fatura: int | None = Field(default=None, ge=1, le=12)
+    ano_fatura: int | None = Field(default=None, ge=2000)
     observacao: str | None = None
 
 class LancamentoUpdate(BaseModel):
     categoria_id: uuid.UUID | None = None
     descricao: str | None = None
-    valor: Decimal | None = None
+    valor: Decimal | None = Field(default=None, gt=0)
     data: date | None = None
     meio_pagamento: MeioPagamento | None = None
     cartao_id: uuid.UUID | None = None
-    mes_fatura: int | None = None
-    ano_fatura: int | None = None
+    mes_fatura: int | None = Field(default=None, ge=1, le=12)
+    ano_fatura: int | None = Field(default=None, ge=2000)
     observacao: str | None = None
 
 class LancamentoOut(BaseModel):
@@ -114,6 +114,7 @@ class LancamentoOut(BaseModel):
     ano_fatura: int | None
     observacao: str | None
     criado_em: datetime
+    recorrencia_id: uuid.UUID | None = None
 
 class LancamentoDetalhe(LancamentoOut):
     categoria: CategoriaOut
@@ -123,20 +124,20 @@ class LancamentoDetalhe(LancamentoOut):
 # ── Empréstimo ──────────────────────────────────────────────────
 class EmprestimoCreate(BaseModel):
     nome: str
-    valor_total: Decimal
-    valor_parcela: Decimal
-    total_parcelas: int
+    valor_total: Decimal = Field(gt=0)
+    valor_parcela: Decimal = Field(gt=0)
+    total_parcelas: int = Field(ge=1)
     data_inicio: date
-    dia_vencimento: int | None = None
+    dia_vencimento: int | None = Field(default=None, ge=1, le=31)
     taxa_juros_mensal: Decimal | None = None
     credor: str | None = None
     observacao: str | None = None
 
 class EmprestimoUpdate(BaseModel):
     nome: str | None = None
-    valor_parcela: Decimal | None = None
-    parcelas_pagas: int | None = None
-    dia_vencimento: int | None = None
+    valor_parcela: Decimal | None = Field(default=None, gt=0)
+    parcelas_pagas: int | None = Field(default=None, ge=0)
+    dia_vencimento: int | None = Field(default=None, ge=1, le=31)
     status: StatusEmprestimo | None = None
     observacao: str | None = None
 
@@ -159,7 +160,7 @@ class EmprestimoOut(BaseModel):
 # ── Parcela ─────────────────────────────────────────────────────
 class ParcelaUpdate(BaseModel):
     data_pagamento: date | None = None
-    valor_pago: Decimal | None = None
+    valor_pago: Decimal | None = Field(default=None, ge=0)
     status: StatusParcela | None = None
     lancamento_id: uuid.UUID | None = None
 
@@ -173,6 +174,9 @@ class ParcelaOut(BaseModel):
     valor_previsto: Decimal
     valor_pago: Decimal | None
     status: StatusParcela
+
+class ParcelaComEmprestimo(ParcelaOut):
+    emprestimo: EmprestimoOut
 
 
 # ── Dashboard ───────────────────────────────────────────────────
@@ -194,3 +198,40 @@ class SaldoMensal(BaseModel):
     total_receitas_plan: Decimal
     total_despesas_plan: Decimal
     saldo_planejado: Decimal
+
+
+class RecorrenciaCreate(BaseModel):
+    categoria_id: uuid.UUID
+    descricao: str
+    valor: Decimal = Field(gt=0)
+    dia: int = Field(ge=1, le=31)
+    meio_pagamento: MeioPagamento = "outros"
+    cartao_id: uuid.UUID | None = None
+    data_inicio: date | None = None
+    data_fim: date | None = None
+
+
+class RecorrenciaUpdate(BaseModel):
+    categoria_id: uuid.UUID | None = None
+    descricao: str | None = None
+    valor: Decimal | None = Field(default=None, gt=0)
+    dia: int | None = Field(default=None, ge=1, le=31)
+    meio_pagamento: MeioPagamento | None = None
+    cartao_id: uuid.UUID | None = None
+    ativo: bool | None = None
+    data_inicio: date | None = None
+    data_fim: date | None = None
+
+
+class RecorrenciaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: uuid.UUID
+    categoria_id: uuid.UUID
+    descricao: str
+    valor: Decimal
+    dia: int
+    meio_pagamento: str
+    cartao_id: uuid.UUID | None
+    ativo: bool
+    data_inicio: date | None
+    data_fim: date | None
