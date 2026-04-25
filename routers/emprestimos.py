@@ -19,25 +19,55 @@ router = APIRouter(prefix="/emprestimos", tags=["Emprestimos"])
 def _gerar_parcelas(emprestimo: Emprestimo) -> list[ParcelaEmprestimo]:
     parcelas = []
     for i in range(emprestimo.total_parcelas):
-        ano = emprestimo.data_inicio.year
-        mes = emprestimo.data_inicio.month + i
-        while mes > 12:
-            mes -= 12
-            ano += 1
-        dia = emprestimo.dia_vencimento or emprestimo.data_inicio.day
-        try:
-            vencimento = date(ano, mes, dia)
-        except ValueError:
-            vencimento = date(ano, mes, 1) + timedelta(days=32)
-            vencimento = vencimento.replace(day=1) - timedelta(days=1)
-
         parcelas.append(ParcelaEmprestimo(
             emprestimo_id=emprestimo.id,
             numero_parcela=i + 1,
-            data_vencimento=vencimento,
+            data_vencimento=_vencimento_parcela(emprestimo, i + 1),
             valor_previsto=emprestimo.valor_parcela,
         ))
     return parcelas
+
+
+def _vencimento_parcela(emprestimo: Emprestimo, numero_parcela: int) -> date:
+    ano = emprestimo.data_inicio.year
+    mes = emprestimo.data_inicio.month + numero_parcela - 1
+    while mes > 12:
+        mes -= 12
+        ano += 1
+    dia = emprestimo.dia_vencimento or emprestimo.data_inicio.day
+    try:
+        return date(ano, mes, dia)
+    except ValueError:
+        vencimento = date(ano, mes, 1) + timedelta(days=32)
+        return vencimento.replace(day=1) - timedelta(days=1)
+
+
+def _sincronizar_parcelas(emprestimo: Emprestimo, db: Session) -> None:
+    parcelas = db.query(ParcelaEmprestimo).filter(
+        ParcelaEmprestimo.emprestimo_id == emprestimo.id
+    ).all()
+    pagas = [p for p in parcelas if p.status == "paga"]
+    if emprestimo.total_parcelas < len(pagas):
+        raise HTTPException(status_code=400, detail="Total de parcelas menor que parcelas ja pagas")
+
+    por_numero = {p.numero_parcela: p for p in parcelas}
+    for numero in range(1, emprestimo.total_parcelas + 1):
+        parcela = por_numero.get(numero)
+        if parcela:
+            if parcela.status != "paga":
+                parcela.data_vencimento = _vencimento_parcela(emprestimo, numero)
+                parcela.valor_previsto = emprestimo.valor_parcela
+        else:
+            db.add(ParcelaEmprestimo(
+                emprestimo_id=emprestimo.id,
+                numero_parcela=numero,
+                data_vencimento=_vencimento_parcela(emprestimo, numero),
+                valor_previsto=emprestimo.valor_parcela,
+            ))
+
+    for parcela in parcelas:
+        if parcela.numero_parcela > emprestimo.total_parcelas and parcela.status != "paga":
+            db.delete(parcela)
 
 
 def _intervalo_mes(mes: int, ano: int) -> tuple[date, date]:
@@ -111,11 +141,28 @@ def atualizar_emprestimo(emprestimo_id: UUID, payload: EmprestimoUpdate, db: Ses
     emprestimo = db.get(Emprestimo, emprestimo_id)
     if not emprestimo:
         raise HTTPException(status_code=404, detail="Emprestimo nao encontrado")
+    dados = payload.model_dump(exclude_unset=True)
     for campo, valor in payload.model_dump(exclude_unset=True).items():
         setattr(emprestimo, campo, valor)
+    if any(campo in dados for campo in ("valor_parcela", "total_parcelas", "data_inicio", "dia_vencimento")):
+        _sincronizar_parcelas(emprestimo, db)
+    db.flush()
+    _recalcular_status_emprestimo(emprestimo_id, db)
     db.commit()
     db.refresh(emprestimo)
     return emprestimo
+
+
+@router.delete("/{emprestimo_id}", status_code=status.HTTP_204_NO_CONTENT)
+def deletar_emprestimo(emprestimo_id: UUID, db: Session = Depends(get_db)):
+    emprestimo = db.get(Emprestimo, emprestimo_id)
+    if not emprestimo:
+        raise HTTPException(status_code=404, detail="Emprestimo nao encontrado")
+    db.query(ParcelaEmprestimo).filter(ParcelaEmprestimo.emprestimo_id == emprestimo_id).delete(
+        synchronize_session=False
+    )
+    db.delete(emprestimo)
+    db.commit()
 
 
 @router.patch("/{emprestimo_id}/parcelas/{parcela_id}", response_model=ParcelaOut)

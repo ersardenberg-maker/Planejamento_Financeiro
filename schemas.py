@@ -135,9 +135,14 @@ class EmprestimoCreate(BaseModel):
 
 class EmprestimoUpdate(BaseModel):
     nome: str | None = None
+    valor_total: Decimal | None = Field(default=None, gt=0)
     valor_parcela: Decimal | None = Field(default=None, gt=0)
+    total_parcelas: int | None = Field(default=None, ge=1)
     parcelas_pagas: int | None = Field(default=None, ge=0)
+    data_inicio: date | None = None
     dia_vencimento: int | None = Field(default=None, ge=1, le=31)
+    taxa_juros_mensal: Decimal | None = None
+    credor: str | None = None
     status: StatusEmprestimo | None = None
     observacao: str | None = None
 
